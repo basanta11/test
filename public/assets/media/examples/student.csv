@@ -1,0 +1,6 @@
+#,email,name,gender,phone,address,guardian_email,guardian_name,guardian_phone,dob,citizen_number,symbol_number
+1,gary.moore@email.com,Gary Moore,male,1201238098,Address 1,mike12@test.com,Mike Moore,981237819,1908-12-01,,1231
+2,corey01@email.com,Corey Taylor,male,1299802312,Address 2,jake1890@test.com,Jake Taylor,987123789,1992-01-12,,90980
+3,eilish2020@email.com,Billie Eilish,others,3321232322,Address 3,sharan09@test.com,Sharon Eilish,8987123898,1993-11-23,,12334
+4,taytay@email.com,Taylor Swift,female,4324311234,Address 4,mayorwest@test.com,Mayor West,23489082,1900-12-11,,123
+5,page.jimi@email.com,Jimmy Page,male,4432879879,Address 5,jackymao@test.com,Jack Page,234234234,1994-09-20,,2345

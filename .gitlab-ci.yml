@@ -1,0 +1,163 @@
+# No need to explicitly write this on your .gitlab-ci.yml file.
+# Add and edit if you want different stage configurations.
+stages:
+  - build
+  - test
+  - deploy
+
+image: lorisleiva/laravel-docker:latest
+
+# Add a `.` infromt of a job to make it hidde.
+# Add a `&reference` to make it a reusable template.
+# Note that we don't have dashes anymore.
+
+.init_ssh: &init_ssh |
+  eval $(ssh-agent -s)
+  echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add - > /dev/null
+  mkdir -p ~/.ssh
+  chmod 700 ~/.ssh
+  ssh-keyscan globalconnectnepal.com >> ~/.ssh/known_hosts
+  chmod 644 ~/.ssh/known_hosts
+# [[ -f /.dockerenv ]] && echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
+
+# Replace the last line with the following lines if you'd rather
+# leave StrictHostKeyChecking enabled (replace yourdomain.com):
+#
+#  ssh-keyscan yourdomain.com >> ~/.ssh/known_hosts
+#  chmod 644 ~/.ssh/known_hosts
+
+.change_file_permissions: &change_file_permissions |
+  find . -type f -not -path "./vendor/*" -exec chmod 664 {} \;    
+  find . -type d -not -path "./vendor/*" -exec chmod 775 {} \;
+
+# TODO: Define our jobs.
+
+#The job's name.
+composer:
+  # The job's stage (build, test or deploy).
+  stage: build
+
+  #What to run on the job.
+  script:
+    - composer install --prefer-dist --no-ansi --no-interaction --no-progress
+    - cp .env.production .env
+    - php artisan key:generate
+
+  artifacts:
+    #(Optional) Give it an expiration date,
+    # after that period you won't be able to
+    # download them via the UI anymore.
+    expire_in: 1 month
+
+    # Define what to output from the job.
+    paths:
+      - vendor/
+      - .env
+
+  cache:
+    # The variable CI_COMMIT_REF_SLUG
+    # refers to the slug of the branch.
+    # For example: `master` for the master branch.
+    # We use the `composer` suffix to avoid conflicts with
+    # the `npm` cache that we'll define next.
+
+    key: ${CI_COMMIT_REF_SLUG}-composer
+
+    # Define what to cache.
+    paths:
+      - vendor/
+
+npm:
+  # Same stage as `composer` so that they run in paralle.
+  stage: build
+
+  # Cache the `node_modules` folder
+  # using the `npm` suffix on the key.
+
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}-npm
+    paths:
+      - node_modules/
+      #Install and compile.
+  script:
+    - npm install
+    - npm run production
+      # Provide the other jobs of the pipeline with
+      # the node dependencies and the compiled assets.
+  artifacts:
+    expire_in: 1 month
+    paths:
+      - node_modules/
+      - public/css/
+      - public/js/
+
+#phpunit:
+#  stage: test
+#
+#  # List of jobs from which it will download the artifacts.
+#  dependencies:
+#    - composer
+#
+#  script:
+#    - phpunit --coverage-text --colors=never
+
+#codestyle:
+#  stage: test
+#  dependencies: []
+#  script:
+#    - phpcs --standard=PSR2 --extensions=php --ignore=app/Support/helpers.php app
+
+dev:
+  stage: deploy
+  script:
+    - *init_ssh
+    - *change_file_permissions
+    - cp .env.dev .env
+    - php artisan deploy dev.globalconnectnepal.com -s upload
+    - cp /var/www/dev.globalconnectnepal.com/current/.env.dev /var/www/dev.globalconnectnepal.com/shared/.env
+    - cd /var/www/dev.globalconnectnepal.com/current
+    - php artisan tenants:migrate
+    - npm install
+    - npm run production
+  environment:
+    name: dev
+    url: http://dev.globalconnectnepal.com
+  only:
+    - development
+
+staging:
+  stage: deploy
+  script:
+    - *init_ssh
+    - *change_file_permissions
+    - cp .env.staging .env
+    - php artisan deploy staging.globalconnectnepal.com -s upload
+    - cp /var/www/staging.globalconnectnepal.com/current/.env.staging /var/www/staging.globalconnectnepal.com/shared/.env
+    - cd /var/www/staging.globalconnectnepal.com/current
+    - php artisan tenants:migrate
+    - npm install
+    - npm run production
+  environment:
+    name: staging
+    url: http://staging.globalconnectnepal.com
+  only:
+    - staging
+
+production:
+  stage: deploy
+  script:
+    - *init_ssh
+    - *change_file_permissions
+    - cp .env.production .env
+    - php artisan deploy globalconnectnepal.com -s upload
+    - cp /var/www/globalconnectnepal.com/current/.env.production /var/www/globalconnectnepal.com/shared/.env
+    - cd /var/www/globalconnectnepal.com/current
+    - php artisan tenants:migrate
+    - npm install
+    - npm run production
+  environment:
+    name: production
+    url: http://globalconnectnepal.com
+  when: manual
+  only:
+    - master

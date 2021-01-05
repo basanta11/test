@@ -1,0 +1,1 @@
+<?php /**PATH E:\_CODING\_develop\tinel\resources\views/frontend/render/news.blade.php ENDPATH**/ ?>
